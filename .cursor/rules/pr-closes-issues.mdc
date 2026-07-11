@@ -1,0 +1,37 @@
+---
+description: When opening a PR that completes a GitHub issue, include Fixes #N so merge auto-closes it
+alwaysApply: true
+---
+
+# PR closes related GitHub issues
+
+When creating or updating a pull request that **fully completes** the work described in one or more GitHub issues:
+
+1. Write a clear PR title and a short markdown body (what changed and why).
+2. In the PR body, include GitHub closing keywords so merging auto-closes the issue(s):
+
+```markdown
+Fixes #2
+```
+
+Use one line per issue if several are fully done:
+
+```markdown
+Fixes #2
+Fixes #5
+```
+
+## When to include `Fixes #N`
+
+- The trigger was `@cursor` (or equivalent) on that issue, **or** the user / prompt named the issue number, **and**
+- The PR actually finishes that issue’s requested work (not a partial spike or unrelated cleanup).
+
+Preferred keyword: `Fixes`. Also valid: `Closes`, `Resolves`.
+
+Put the keyword in the **PR body** (not only in a chat reply). Commit messages may include it too, but the PR body is required.
+
+## When NOT to include it
+
+- The PR is exploratory, draft-only, or only partially addresses the issue.
+- You are unsure which issue number applies — omit the keyword and mention the uncertainty in the PR body instead of guessing.
+- The change is unrelated to any open issue.
