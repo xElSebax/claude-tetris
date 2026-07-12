@@ -1,8 +1,8 @@
 # Triage GitHub issues with a Cursor Cloud Agent (create/edit only).
-# Requires repo secret: CURSOR_ACTION_TOKEN (Cloud Agents API key from Cursor dashboard).
-# Optional repo secret: GH_PAT — PAT with issues:write if the agent cannot comment/label with the default token.
+# Requires repo secret: CURSOR_ACTION_TOKEN (Cloud Agents API key).
 #
-# Disable any Cursor Automation that triggers on issue comments to avoid loops.
+# Flow: launch agent → wait until finished → post diagnosis comment + labels on the issue.
+# Disable Cursor Automations on issue comments to avoid loops.
 
 name: Cursor issue triage
 
@@ -22,6 +22,7 @@ jobs:
   triage:
     if: github.event.issue.pull_request == null
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Skip if already triaged or in progress
         id: guard
@@ -53,7 +54,7 @@ jobs:
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure triage labels exist
+      - name: Ensure labels exist
         if: steps.guard.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,6 +68,13 @@ jobs:
           }
           ensure_label "cursor-triaging" "FBCA04" "Cursor issue triage in progress"
           ensure_label "cursor-triaged" "0E8A16" "Cursor issue triage completed"
+          ensure_label "bug" "D73A4A" "Something isn't working"
+          ensure_label "enhancement" "A2EEEF" "New feature or request"
+          ensure_label "controls" "5319E7" "Input / keyboard controls"
+          ensure_label "ui" "C5DEF5" "User interface"
+          ensure_label "gameplay" "BFDADC" "Game rules / pieces / scoring"
+          ensure_label "docs" "0075CA" "Documentation"
+          ensure_label "question" "D876E3" "Further information is requested"
 
       - name: Mark issue as triaging
         if: steps.guard.outputs.skip == 'false'
@@ -79,7 +87,7 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         uses: actions/checkout@v5
 
-      - name: Launch Cursor Cloud Agent
+      - name: Launch, wait, and publish triage on the issue
         if: steps.guard.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,13 +102,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${CURSOR_ACTION_TOKEN:-}" ]; then
-            echo "::error::Missing secret CURSOR_ACTION_TOKEN. Create a Cloud Agents API key in the Cursor dashboard (Cloud Agents → API keys) and add it as a repo secret."
+            echo "::error::Missing secret CURSOR_ACTION_TOKEN."
             exit 1
           fi
 
           instructions="$(cat .github/prompts/cursor-issue-triage.md)"
 
-          # Legacy v0 launch payload (stable for Actions). model "default" avoids invalid model-id 400s.
           payload="$(jq -n \
             --arg instructions "$instructions" \
             --arg issue "$ISSUE" \
@@ -122,7 +129,6 @@ jobs:
               + "### Issue body\n\n"
               + (if ($body | length) == 0 then "(empty)" else $body end)
               + "\n";
-
             {
               prompt: { text: prompt_text },
               model: "default",
@@ -131,9 +137,9 @@ jobs:
             }
             ')"
 
-          echo "Launching Cursor agent (v0) for issue #$ISSUE…"
+          echo "Launching Cursor agent for issue #$ISSUE…"
           http_code="$(curl --silent --show-error \
-            --output /tmp/cursor-agent-response.json \
+            --output /tmp/cursor-launch.json \
             --write-out "%{http_code}" \
             --request POST \
             --url "https://api.cursor.com/v0/agents" \
@@ -141,22 +147,129 @@ jobs:
             --header "Content-Type: application/json" \
             --data "$payload")"
 
-          echo "HTTP $http_code"
-          cat /tmp/cursor-agent-response.json
+          echo "Launch HTTP $http_code"
+          cat /tmp/cursor-launch.json
           echo
 
           if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "::error::Cursor API launch failed with HTTP $http_code. Check CURSOR_ACTION_TOKEN (Cloud Agents API key) and that this repo is connected in Cursor."
-            jq . /tmp/cursor-agent-response.json 2>/dev/null || true
+            echo "::error::Cursor API launch failed with HTTP $http_code."
             exit 1
           fi
 
-          agent_url="$(jq -r '.target.url // empty' /tmp/cursor-agent-response.json)"
-          if [ -n "$agent_url" ]; then
-            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
-              --body "Triage encolado con Cursor Cloud Agent: $agent_url" \
-              || true
+          agent_id="$(jq -r '.id // empty' /tmp/cursor-launch.json)"
+          agent_url="$(jq -r '.target.url // empty' /tmp/cursor-launch.json)"
+          if [ -z "$agent_id" ]; then
+            echo "::error::Launch response missing agent id."
+            exit 1
           fi
+          echo "agent_id=$agent_id"
+          echo "agent_url=$agent_url"
+
+          # Wait until the agent finishes (or fails).
+          deadline=$((SECONDS + 1200))
+          status=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            curl --silent --show-error \
+              --output /tmp/cursor-status.json \
+              --request GET \
+              --url "https://api.cursor.com/v0/agents/${agent_id}" \
+              -u "${CURSOR_ACTION_TOKEN}:"
+
+            status="$(jq -r '.status // empty' /tmp/cursor-status.json)"
+            echo "status=$status"
+            case "$status" in
+              FINISHED|COMPLETED|DONE) break ;;
+              ERROR|FAILED|EXPIRED|CANCELLED|CANCELED)
+                echo "::error::Cursor agent ended with status=$status"
+                cat /tmp/cursor-status.json
+                exit 1
+                ;;
+              *) sleep 20 ;;
+            esac
+          done
+
+          if [ "$status" != "FINISHED" ] && [ "$status" != "COMPLETED" ] && [ "$status" != "DONE" ]; then
+            echo "::error::Timed out waiting for Cursor agent (last status=$status)."
+            exit 1
+          fi
+
+          # Fetch conversation and pick the best assistant diagnosis.
+          curl --silent --show-error \
+            --output /tmp/cursor-conversation.json \
+            --request GET \
+            --url "https://api.cursor.com/v0/agents/${agent_id}/conversation" \
+            -u "${CURSOR_ACTION_TOKEN}:"
+
+          diagnosis="$(jq -r '
+            [
+              .messages[]?
+              | select((.type // "") | test("assistant"; "i"))
+              | (.text // .content // "")
+              | select(length > 0)
+            ] as $msgs
+            | ($msgs | map(select(test("##\\s+(Triage diagnosis|Diagnóstico de triage)"; "i"))) | last)
+              // ($msgs | last)
+              // empty
+          ' /tmp/cursor-conversation.json)"
+
+          if [ -z "$diagnosis" ] || [ "$diagnosis" = "null" ]; then
+            summary="$(jq -r '.summary // empty' /tmp/cursor-status.json)"
+            if [ -n "$summary" ]; then
+              diagnosis="## Diagnóstico de triage
+
+### Resumen
+$summary"
+            else
+              echo "::error::Could not extract a diagnosis from the agent conversation."
+              cat /tmp/cursor-conversation.json
+              exit 1
+            fi
+          fi
+
+          # Parse LABELS: line (comma-separated). Strip that line from the posted body.
+          labels_line="$(printf '%s\n' "$diagnosis" | grep -E '^LABELS:' | tail -n1 || true)"
+          body="$(printf '%s\n' "$diagnosis" | sed -E '/^LABELS:/d')"
+
+          # Append agent link as a small footer (diagnosis remains in the issue body).
+          if [ -n "$agent_url" ]; then
+            body="${body}
+
+---
+_Agente Cursor: ${agent_url}_"
+          fi
+
+          printf '%s\n' "$body" > /tmp/diagnosis-comment.md
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file /tmp/diagnosis-comment.md
+
+          # Apply suggested labels + cursor-triaged; remove cursor-triaging.
+          allowed='bug enhancement controls ui gameplay docs question'
+          to_add="cursor-triaged"
+          if [ -n "$labels_line" ]; then
+            raw="$(printf '%s' "$labels_line" | sed -E 's/^LABELS:[[:space:]]*//')"
+            IFS=',' read -r -a parts <<< "$raw"
+            for p in "${parts[@]}"; do
+              name="$(echo "$p" | tr -d '`"'"'"' | xargs)"
+              name="$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+              if [ -z "$name" ]; then continue; fi
+              if echo " $allowed " | grep -Fq " $name "; then
+                to_add="$to_add,$name"
+              fi
+            done
+          fi
+
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --remove-label "cursor-triaging" \
+            --add-label "$to_add" || {
+              # Fallback if combined add fails: apply one by one.
+              gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label "cursor-triaging" || true
+              IFS=',' read -r -a add_parts <<< "$to_add"
+              for name in "${add_parts[@]}"; do
+                [ -n "$name" ] || continue
+                gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --add-label "$name" || true
+              done
+            }
+
+          echo "Published diagnosis and labels ($to_add) on #$ISSUE"
 
       - name: Clear triaging label on failure
         if: failure() && steps.guard.outputs.skip == 'false'

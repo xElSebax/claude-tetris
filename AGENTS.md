@@ -46,12 +46,12 @@ Changing one without the other breaks rendering. The next-piece canvas
 ## Issue triage (GitHub Actions)
 
 On issue **opened** or **edited** (not PRs), `.github/workflows/cursor-issue-triage.yml`
-launches a Cursor Cloud Agent using `.github/prompts/cursor-issue-triage.md`.
+launches a Cursor Cloud Agent, waits for it to finish, then posts the diagnosis
+as an issue comment and applies labels (via Actions `gh`, not the agent).
 
-- Skips when labels `cursor-triaging` / `cursor-triaged` exist, or a prior
-  triage diagnosis comment is already on the issue.
-- Requires repo secret `CURSOR_ACTION_TOKEN` (Cloud Agents API key). Put
-  `GH_TOKEN`/`GH_PAT` in Cursor Cloud Agent secrets if the agent cannot
-  comment or label issues.
+- Prompt: `.github/prompts/cursor-issue-triage.md`
+- Skips when `cursor-triaging` / `cursor-triaged` exist, or a prior diagnosis
+  heading is already on the issue.
+- Requires repo secret `CURSOR_ACTION_TOKEN` (Cloud Agents API key).
 - Prefer this Action over Cursor Automations on issue comments (comment
   triggers can loop).
