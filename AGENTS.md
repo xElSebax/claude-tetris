@@ -50,7 +50,7 @@ launches a Cursor Cloud Agent using `.github/prompts/cursor-issue-triage.md`.
 
 - Skips when labels `cursor-triaging` / `cursor-triaged` exist, or a prior
   triage diagnosis comment is already on the issue.
-- Requires repo secret `CURSOR_API_KEY`. Optional `GH_PAT` if the agent needs
+- Requires repo secret `CURSOR_ACTION_TOKEN`. Optional `GH_PAT` if the agent needs
   stronger GitHub issues write access.
 - Prefer this Action over Cursor Automations on issue comments (comment
   triggers can loop).
