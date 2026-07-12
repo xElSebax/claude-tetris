@@ -207,7 +207,9 @@ jobs:
               | (.text // .content // "")
               | select(length > 0)
             ] as $msgs
-            | ($msgs | map(select(test("##\\s+(Triage diagnosis|Diagnóstico de triage)"; "i"))) | last)
+            | ($msgs
+                | map(select(test("##[[:space:]]+(Triage diagnosis|Diagn)"; "i")))
+                | last)
               // ($msgs | last)
               // empty
           ' /tmp/cursor-conversation.json)"
@@ -215,10 +217,13 @@ jobs:
           if [ -z "$diagnosis" ] || [ "$diagnosis" = "null" ]; then
             summary="$(jq -r '.summary // empty' /tmp/cursor-status.json)"
             if [ -n "$summary" ]; then
-              diagnosis="## Diagnóstico de triage
-
-### Resumen
-$summary"
+              {
+                echo "## Diagnóstico de triage"
+                echo
+                echo "### Resumen"
+                echo "$summary"
+              } > /tmp/diagnosis-raw.md
+              diagnosis="$(cat /tmp/diagnosis-raw.md)"
             else
               echo "::error::Could not extract a diagnosis from the agent conversation."
               cat /tmp/cursor-conversation.json
@@ -232,13 +237,11 @@ $summary"
 
           # Append agent link as a small footer (diagnosis remains in the issue body).
           if [ -n "$agent_url" ]; then
-            body="${body}
-
----
-_Agente Cursor: ${agent_url}_"
+            printf '%s\n\n%s\n%s\n' "$body" "----" "_Agente Cursor: ${agent_url}_" > /tmp/diagnosis-comment.md
+          else
+            printf '%s\n' "$body" > /tmp/diagnosis-comment.md
           fi
 
-          printf '%s\n' "$body" > /tmp/diagnosis-comment.md
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file /tmp/diagnosis-comment.md
 
           # Apply suggested labels + cursor-triaged; remove cursor-triaging.
@@ -248,7 +251,7 @@ _Agente Cursor: ${agent_url}_"
             raw="$(printf '%s' "$labels_line" | sed -E 's/^LABELS:[[:space:]]*//')"
             IFS=',' read -r -a parts <<< "$raw"
             for p in "${parts[@]}"; do
-              name="$(echo "$p" | tr -d '`"'"'"' | xargs)"
+              name="$(echo "$p" | sed 's/[^A-Za-z0-9_-]//g')"
               name="$(echo "$name" | tr '[:upper:]' '[:lower:]')"
               if [ -z "$name" ]; then continue; fi
               if echo " $allowed " | grep -Fq " $name "; then
@@ -257,17 +260,16 @@ _Agente Cursor: ${agent_url}_"
             done
           fi
 
-          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+          if ! gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" \
             --remove-label "cursor-triaging" \
-            --add-label "$to_add" || {
-              # Fallback if combined add fails: apply one by one.
+            --add-label "$to_add"; then
               gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label "cursor-triaging" || true
               IFS=',' read -r -a add_parts <<< "$to_add"
               for name in "${add_parts[@]}"; do
                 [ -n "$name" ] || continue
                 gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --add-label "$name" || true
               done
-            }
+          fi
 
           echo "Published diagnosis and labels ($to_add) on #$ISSUE"
 
