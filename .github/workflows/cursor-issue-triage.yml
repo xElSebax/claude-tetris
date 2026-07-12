@@ -77,14 +77,13 @@ jobs:
 
       - name: Checkout (for triage prompt)
         if: steps.guard.outputs.skip == 'false'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Launch Cursor Cloud Agent
         if: steps.guard.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
           CURSOR_ACTION_TOKEN: ${{ secrets.CURSOR_ACTION_TOKEN }}
-          GH_PAT: ${{ secrets.GH_PAT }}
           ISSUE: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -95,13 +94,13 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${CURSOR_ACTION_TOKEN:-}" ]; then
-            echo "::error::Missing secret CURSOR_ACTION_TOKEN. Create a Cloud Agents API key in the Cursor dashboard and add it as a repo secret."
+            echo "::error::Missing secret CURSOR_ACTION_TOKEN. Create a Cloud Agents API key in the Cursor dashboard (Cloud Agents → API keys) and add it as a repo secret."
             exit 1
           fi
 
           instructions="$(cat .github/prompts/cursor-issue-triage.md)"
 
-          # Build JSON payload with jq (safe escaping for title/body).
+          # Legacy v0 launch payload (stable for Actions). model "default" avoids invalid model-id 400s.
           payload="$(jq -n \
             --arg instructions "$instructions" \
             --arg issue "$ISSUE" \
@@ -111,7 +110,6 @@ jobs:
             --arg user "$ISSUE_USER" \
             --arg repo "$REPO_URL" \
             --arg ref "$DEFAULT_BRANCH" \
-            --arg gh_pat "${GH_PAT:-}" \
             '
             def prompt_text:
               $instructions
@@ -127,31 +125,42 @@ jobs:
 
             {
               prompt: { text: prompt_text },
-              model: { id: "composer-2.5" },
-              name: ("Triage #" + $issue + ": " + $title),
-              repos: [ { url: $repo, startingRef: $ref } ],
-              autoCreatePR: false,
-              workOnCurrentBranch: false
+              model: "default",
+              source: { repository: $repo, ref: $ref },
+              target: { autoCreatePr: false }
             }
-            + (if ($gh_pat | length) > 0 then
-                { envVars: { GH_TOKEN: $gh_pat, GITHUB_TOKEN: $gh_pat } }
-              else
-                {}
-              end)
             ')"
 
-          echo "Launching Cursor agent for issue #$ISSUE…"
-          response="$(curl --fail-with-body --silent --show-error \
+          echo "Launching Cursor agent (v0) for issue #$ISSUE…"
+          http_code="$(curl --silent --show-error \
+            --output /tmp/cursor-agent-response.json \
+            --write-out "%{http_code}" \
             --request POST \
-            --url "https://api.cursor.com/v1/agents" \
+            --url "https://api.cursor.com/v0/agents" \
             -u "${CURSOR_ACTION_TOKEN}:" \
             --header "Content-Type: application/json" \
             --data "$payload")"
 
-          echo "$response" | jq .
-          agent_url="$(echo "$response" | jq -r '.agent.url // empty')"
+          echo "HTTP $http_code"
+          cat /tmp/cursor-agent-response.json
+          echo
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Cursor API launch failed with HTTP $http_code. Check CURSOR_ACTION_TOKEN (Cloud Agents API key) and that this repo is connected in Cursor."
+            jq . /tmp/cursor-agent-response.json 2>/dev/null || true
+            exit 1
+          fi
+
+          agent_url="$(jq -r '.target.url // empty' /tmp/cursor-agent-response.json)"
           if [ -n "$agent_url" ]; then
             gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
               --body "Triage encolado con Cursor Cloud Agent: $agent_url" \
               || true
           fi
+
+      - name: Clear triaging label on failure
+        if: failure() && steps.guard.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label "cursor-triaging" || true
