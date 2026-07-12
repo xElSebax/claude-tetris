@@ -42,3 +42,15 @@ Changing one without the other breaks rendering. The next-piece canvas
   `Array.from`, template literals).
 - UI strings and `README.md`: Spanish. Match the existing language when
   editing each kind — don't translate one to the other.
+
+## Issue triage (GitHub Actions)
+
+On issue **opened** or **edited** (not PRs), `.github/workflows/cursor-issue-triage.yml`
+launches a Cursor Cloud Agent using `.github/prompts/cursor-issue-triage.md`.
+
+- Skips when labels `cursor-triaging` / `cursor-triaged` exist, or a prior
+  triage diagnosis comment is already on the issue.
+- Requires repo secret `CURSOR_API_KEY`. Optional `GH_PAT` if the agent needs
+  stronger GitHub issues write access.
+- Prefer this Action over Cursor Automations on issue comments (comment
+  triggers can loop).
