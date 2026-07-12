@@ -258,19 +258,25 @@ function updateThemeButtons() {
   themeLightBtn.setAttribute('aria-pressed', String(!isDark));
 }
 
-function setTheme(nextTheme) {
-  if (nextTheme !== 'dark' && nextTheme !== 'light') return;
+function applyTheme(nextTheme) {
   theme = nextTheme;
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem(THEME_KEY, theme);
   updateThemeButtons();
-  draw();
-  drawNext();
+}
+
+function setTheme(nextTheme) {
+  if (nextTheme !== 'dark' && nextTheme !== 'light') return;
+  applyTheme(nextTheme);
+  if (board) {
+    draw();
+    drawNext();
+  }
 }
 
 function initTheme() {
   const saved = localStorage.getItem(THEME_KEY);
-  setTheme(saved === 'light' ? 'light' : 'dark');
+  applyTheme(saved === 'light' ? 'light' : 'dark');
 }
 
 function loop(ts) {
