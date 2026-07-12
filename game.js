@@ -39,8 +39,17 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeDarkBtn = document.getElementById('theme-dark');
+const themeLightBtn = document.getElementById('theme-light');
+
+const THEME_KEY = 'tetris-theme';
+const THEME_COLORS = {
+  dark: { grid: '#22222e' },
+  light: { grid: '#d0d0dc' },
+};
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let theme = 'dark';
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -169,7 +178,7 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = THEME_COLORS[theme].grid;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -241,6 +250,35 @@ function togglePause() {
   }
 }
 
+function updateThemeButtons() {
+  const isDark = theme === 'dark';
+  themeDarkBtn.classList.toggle('active', isDark);
+  themeLightBtn.classList.toggle('active', !isDark);
+  themeDarkBtn.setAttribute('aria-pressed', String(isDark));
+  themeLightBtn.setAttribute('aria-pressed', String(!isDark));
+}
+
+function applyTheme(nextTheme) {
+  theme = nextTheme;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
+  updateThemeButtons();
+}
+
+function setTheme(nextTheme) {
+  if (nextTheme !== 'dark' && nextTheme !== 'light') return;
+  applyTheme(nextTheme);
+  if (board) {
+    draw();
+    drawNext();
+  }
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  applyTheme(saved === 'light' ? 'light' : 'dark');
+}
+
 function loop(ts) {
   const dt = ts - lastTime;
   lastTime = ts;
@@ -301,5 +339,8 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+themeDarkBtn.addEventListener('click', () => setTheme('dark'));
+themeLightBtn.addEventListener('click', () => setTheme('light'));
 
+initTheme();
 init();
