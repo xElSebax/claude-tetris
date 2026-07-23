@@ -40,6 +40,26 @@
           </div>
         </div>
 
+        <div class="panel-section">
+          <span class="label">SKIN</span>
+          <div class="skin-toggle" role="group" aria-label="Selector de skin">
+            <button type="button" id="skin-retro" class="skin-btn active" data-skin="retro" aria-pressed="true">Retro</button>
+            <button type="button" id="skin-neon" class="skin-btn" data-skin="neon" aria-pressed="false">Neon</button>
+            <button type="button" id="skin-pastel" class="skin-btn" data-skin="pastel" aria-pressed="false">Pastel</button>
+            <button type="button" id="skin-pixel" class="skin-btn" data-skin="pixel" aria-pressed="false">Pixel</button>
+          </div>
+        </div>
+
+        <div class="panel-section records-section">
+          <span class="label">RECORDS</span>
+          <div class="records-stats">
+            <span>Combo: <strong id="best-combo">0</strong></span>
+            <span>Líneas: <strong id="max-lines">0</strong></span>
+          </div>
+          <ol id="sidebar-records" class="records-list"></ol>
+          <button type="button" id="reset-records-btn" class="records-reset-btn">Resetear</button>
+        </div>
+
         <div class="panel-section controls">
           <span class="label">CONTROLS</span>
           <ul>
@@ -47,17 +67,61 @@
             <li><kbd>↑</kbd> rotar</li>
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
-            <li><kbd>P</kbd> pausa</li>
+            <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
           </ul>
         </div>
       </aside>
     </div>
 
     <div id="overlay" class="overlay hidden">
-      <div class="overlay-box">
+      <div id="gameover-panel" class="overlay-box hidden">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
-        <button id="restart-btn">Reiniciar</button>
+        <div id="overlay-save" class="overlay-save hidden">
+          <p class="overlay-save-label">¡Nuevo record! Introduce tu nombre:</p>
+          <input type="text" id="player-name" class="player-name-input" maxlength="12" placeholder="Jugador" />
+          <button type="button" id="save-score-btn" class="save-score-btn">Guardar</button>
+        </div>
+        <div class="overlay-records">
+          <span class="label">TOP 5</span>
+          <div class="records-stats">
+            <span>Combo: <strong id="overlay-best-combo">0</strong></span>
+            <span>Líneas: <strong id="overlay-max-lines">0</strong></span>
+          </div>
+          <ol id="overlay-records" class="records-list"></ol>
+        </div>
+        <button id="restart-btn" type="button">Reiniciar</button>
+      </div>
+
+      <div id="pause-panel" class="overlay-box pause-box hidden">
+        <p class="pause-title">PAUSA</p>
+
+        <nav id="pause-main" class="pause-menu" aria-label="Menú de pausa">
+          <button id="resume-btn" type="button" class="pause-btn pause-btn-primary">Reanudar</button>
+          <button id="pause-restart-btn" type="button" class="pause-btn">Reiniciar</button>
+          <button id="show-controls-btn" type="button" class="pause-btn">Ver controles</button>
+        </nav>
+
+        <div class="pause-level">
+          <label class="pause-level-label" for="start-level">Nivel inicial</label>
+          <div class="pause-level-row">
+            <button id="level-down" type="button" class="level-step" aria-label="Bajar nivel">−</button>
+            <span id="start-level-value" class="pause-level-value" aria-live="polite">1</span>
+            <button id="level-up" type="button" class="level-step" aria-label="Subir nivel">+</button>
+          </div>
+        </div>
+
+        <div id="pause-controls" class="pause-controls hidden">
+          <p class="pause-subtitle">Controles</p>
+          <ul class="pause-controls-list">
+            <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+            <li><kbd>↑</kbd> / <kbd>X</kbd> rotar</li>
+            <li><kbd>↓</kbd> bajar suave</li>
+            <li><kbd>Space</kbd> caída dura</li>
+            <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
+          </ul>
+          <button id="back-from-controls" type="button" class="pause-btn">Volver</button>
+        </div>
       </div>
     </div>
   </div>
