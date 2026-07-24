@@ -33,11 +33,27 @@
         </div>
 
         <div class="panel-section">
+          <span class="label">APARIENCIA</span>
+          <div class="skin-toggle" role="group" aria-label="Apariencia del tablero">
+            <button type="button" data-skin="retro" class="skin-btn active" aria-pressed="true">Retro</button>
+            <button type="button" data-skin="neon" class="skin-btn" aria-pressed="false">Neón</button>
+            <button type="button" data-skin="pastel" class="skin-btn" aria-pressed="false">Pastel</button>
+            <button type="button" data-skin="pixel" class="skin-btn" aria-pressed="false">Pixel</button>
+          </div>
+        </div>
+
+        <div class="panel-section">
           <span class="label">TEMA</span>
           <div class="theme-toggle">
             <button type="button" id="theme-dark" class="theme-btn active" aria-pressed="true">Oscuro</button>
             <button type="button" id="theme-light" class="theme-btn" aria-pressed="false">Claro</button>
           </div>
+        </div>
+
+        <div class="panel-section records-panel">
+          <span class="label">RECORDS</span>
+          <div id="sidebar-records" class="records-table-wrap"></div>
+          <button type="button" id="sidebar-reset-records" class="records-reset-btn">Borrar records</button>
         </div>
 
         <div class="panel-section controls">
@@ -85,7 +101,19 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
-        <button type="button" id="restart-btn" class="menu-btn primary">Reiniciar</button>
+        <p id="overlay-stats" class="overlay-stats hidden"></p>
+        <p id="overlay-qualify" class="overlay-qualify hidden">¡Entraste al top 5!</p>
+        <div id="name-form" class="name-form hidden">
+          <label for="player-name">Nombre</label>
+          <input type="text" id="player-name" maxlength="20" placeholder="Tu nombre" autocomplete="off" />
+          <button type="button" id="save-record-btn">Guardar puntuación</button>
+        </div>
+        <div id="overlay-records" class="records-table-wrap overlay-records"></div>
+        <div class="overlay-actions">
+          <button type="button" id="play-btn" class="hidden">Jugar</button>
+          <button type="button" id="restart-btn" class="menu-btn primary">Reiniciar</button>
+          <button type="button" id="reset-records-btn" class="records-reset-btn">Borrar records</button>
+        </div>
       </div>
     </div>
   </div>

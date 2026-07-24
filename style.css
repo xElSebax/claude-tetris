@@ -104,7 +104,7 @@ body {
 
 /* ---- Panel lateral ---- */
 .panel {
-  width: 160px;
+  width: 200px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -137,6 +137,36 @@ body {
   border: 1px solid var(--border);
   background: var(--panel-bg);
   border-radius: 4px;
+}
+
+/* ---- Apariencia (skins) ---- */
+.skin-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.skin-btn {
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 4px;
+  padding: 6px 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.skin-btn:hover {
+  color: var(--text);
+}
+
+.skin-btn.active {
+  background: var(--toggle-active);
+  border-color: var(--toggle-active);
+  color: var(--toggle-active-text);
 }
 
 /* ---- Tema ---- */
@@ -217,6 +247,9 @@ kbd {
   flex-direction: column;
   gap: 12px;
   align-items: center;
+  max-width: 440px;
+  width: 100%;
+  padding: 0 12px;
 }
 
 #overlay-title {
@@ -359,4 +392,155 @@ kbd {
   color: var(--accent);
   min-width: 28px;
   text-align: center;
+}
+
+.overlay-stats {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.overlay-qualify {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.name-form label {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--label);
+  font-weight: 600;
+  text-align: left;
+}
+
+.name-form input {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+}
+
+.name-form input:focus {
+  border-color: var(--accent);
+}
+
+#save-record-btn,
+#play-btn {
+  background: var(--accent);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.15s;
+}
+
+#save-record-btn:hover,
+#play-btn:hover {
+  background: var(--accent-hover);
+}
+
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.records-reset-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.records-reset-btn:hover {
+  color: var(--overlay-title);
+  border-color: var(--overlay-title);
+}
+
+.records-panel .records-reset-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.records-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.records-table th,
+.records-table td {
+  padding: 4px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.records-table th {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--label);
+  font-weight: 600;
+}
+
+.records-table td {
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--text);
+}
+
+.records-table .col-score {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.records-table tr.record-highlight td {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.records-table tr.record-highlight .col-score {
+  color: var(--accent-hover);
+}
+
+.records-empty {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  padding: 6px 0;
+}
+
+.overlay-records .records-table {
+  font-size: 12px;
+}
+
+.overlay-records .records-table th {
+  font-size: 10px;
 }
