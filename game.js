@@ -3,6 +3,7 @@
 const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
+const MAX_START_LEVEL = 15;
 
 const COLORS = [
   null,
@@ -37,14 +38,23 @@ const nextCtx = nextCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
-const overlay = document.getElementById('overlay');
+const pauseOverlay = document.getElementById('pause-overlay');
+const gameOverOverlay = document.getElementById('game-over-overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const toggleControlsBtn = document.getElementById('toggle-controls-btn');
+const pauseControls = document.getElementById('pause-controls');
+const levelDownBtn = document.getElementById('level-down');
+const levelUpBtn = document.getElementById('level-up');
+const startLevelDisplay = document.getElementById('start-level-display');
 const themeDarkBtn = document.getElementById('theme-dark');
 const themeLightBtn = document.getElementById('theme-light');
 
 const THEME_KEY = 'tetris-theme';
+const START_LEVEL_KEY = 'tetris-start-level';
 const THEME_COLORS = {
   dark: { grid: '#22222e' },
   light: { grid: '#d0d0dc' },
@@ -52,6 +62,16 @@ const THEME_COLORS = {
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let theme = 'dark';
+let startLevel = 1;
+let pauseControlsVisible = false;
+
+function dropIntervalForLevel(lv) {
+  return Math.max(100, 1000 - (lv - 1) * 90);
+}
+
+function levelFromLines() {
+  return startLevel + Math.floor(lines / 10);
+}
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -117,8 +137,8 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    level = levelFromLines();
+    dropInterval = dropIntervalForLevel(level);
     updateHUD();
   }
 }
@@ -165,6 +185,16 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+}
+
+function updateStartLevelDisplay() {
+  startLevelDisplay.textContent = startLevel;
+}
+
+function setStartLevel(value) {
+  startLevel = Math.max(1, Math.min(MAX_START_LEVEL, value));
+  localStorage.setItem(START_LEVEL_KEY, String(startLevel));
+  updateStartLevelDisplay();
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -233,24 +263,47 @@ function drawNext() {
 
 function endGame() {
   gameOver = true;
+  paused = false;
   cancelAnimationFrame(animId);
+  pauseOverlay.classList.add('hidden');
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
-  overlay.classList.remove('hidden');
+  gameOverOverlay.classList.remove('hidden');
+}
+
+function setPauseControlsVisible(visible) {
+  pauseControlsVisible = visible;
+  pauseControls.classList.toggle('hidden', !visible);
+  toggleControlsBtn.textContent = visible ? 'Ocultar controles' : 'Ver controles';
+}
+
+function showPauseMenu() {
+  paused = true;
+  cancelAnimationFrame(animId);
+  setPauseControlsVisible(false);
+  updateStartLevelDisplay();
+  pauseOverlay.classList.remove('hidden');
+}
+
+function hidePauseMenu() {
+  paused = false;
+  pauseOverlay.classList.add('hidden');
+  setPauseControlsVisible(false);
+}
+
+function resumeGame() {
+  if (gameOver || !paused) return;
+  hidePauseMenu();
+  lastTime = performance.now();
+  loop(lastTime);
 }
 
 function togglePause() {
   if (gameOver) return;
-  paused = !paused;
-  if (!paused) {
-    overlay.classList.add('hidden');
-    lastTime = performance.now();
-    loop(lastTime);
+  if (paused) {
+    resumeGame();
   } else {
-    cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
+    showPauseMenu();
   }
 }
 
@@ -283,6 +336,12 @@ function initTheme() {
   applyTheme(saved === 'light' ? 'light' : 'dark');
 }
 
+function initStartLevel() {
+  const saved = parseInt(localStorage.getItem(START_LEVEL_KEY), 10);
+  startLevel = Number.isFinite(saved) && saved >= 1 && saved <= MAX_START_LEVEL ? saved : 1;
+  updateStartLevelDisplay();
+}
+
 function loop(ts) {
   if (paused || gameOver) return;
   const dt = ts - lastTime;
@@ -305,22 +364,30 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = dropIntervalForLevel(level);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
-  overlay.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  gameOverOverlay.classList.add('hidden');
+  setPauseControlsVisible(false);
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (!gameOver) {
+      e.preventDefault();
+      togglePause();
+    }
+    return;
+  }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -344,9 +411,15 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
+resumeBtn.addEventListener('click', resumeGame);
+pauseRestartBtn.addEventListener('click', init);
 restartBtn.addEventListener('click', init);
+toggleControlsBtn.addEventListener('click', () => setPauseControlsVisible(!pauseControlsVisible));
+levelDownBtn.addEventListener('click', () => setStartLevel(startLevel - 1));
+levelUpBtn.addEventListener('click', () => setStartLevel(startLevel + 1));
 themeDarkBtn.addEventListener('click', () => setTheme('dark'));
 themeLightBtn.addEventListener('click', () => setTheme('light'));
 
 initTheme();
+initStartLevel();
 init();
